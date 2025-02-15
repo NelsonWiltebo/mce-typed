@@ -10,7 +10,7 @@ import {
 
 type NonEmptyList<T> = Pair<T, List<T>>;
 
-type Environment = List<Frame>;
+export type Environment = List<Frame>;
 type Frame = Pair<List<Symbol>, List<Value>>;
 
 type TaggedList = Pair<string, any>;
@@ -65,9 +65,9 @@ type Binary= { tag: "binary_operator_combination", operator: Operator, left: Exp
 
 // these can remain as tagged lists (but you are free to change them too)
 type Value = string | number | boolean | undefined | null | ReturnValue | CompoundFunction | Primitive;
-type ReturnValue = ["return_value", [Value, null]];
-type CompoundFunction = ["compound_function", [List<Symbol>, [Component, [Environment, null]]]];
-type Primitive = ["primitive", [(..._: any[]) => any, null]];
+type ReturnValue = {tag: "return_value", content: Value};
+type CompoundFunction = {tag: "compound_function", arguments: List<Symbol>, body: Component, env: Environment};
+type Primitive = {tag: "primitive", value: (..._: any[]) => any};
 
 type Symbol = string;
 
@@ -353,84 +353,88 @@ function eval_declaration(component: Declaration, env: Environment): void {
 
 // functions from SICP JS 4.1.2
 
-function is_tagged_list(component: any, the_tag: string): boolean {
-    return is_pair(component) && head(component) === the_tag;
+function is_tagged_record(component: any, the_tag: string): boolean {
+    return is_pair(component) ? false : (component as TaggedRecord).tag === the_tag;
 }
 
 function is_literal(component: Component): component is Literal {
-    return is_tagged_list(component, "literal");
+    return is_tagged_record(component, "literal");
 }
 function literal_value(component: Literal): Value {
-    return head(tail(component));
+    return component.value;
 }
 
 function make_literal(value: Value): Literal {
-    return pair("literal", pair(value, null));
+    return {tag: "literal", value: value};
 }
 
 function is_name(component: Component): component is Name {
-    return is_tagged_list(component, "name");
+    return is_tagged_record(component, "name");
 }
 
 function make_name(symbol: Symbol): Name {
-    return pair("name", pair(symbol, null));
+    return {tag: "name", symbol: symbol};
 }
 
 function symbol_of_name(component: Name): Symbol {
-    return head(tail(component));
+    return component.symbol;
 }
 
 function is_assignment(component: Component): component is Assignment {
-    return is_tagged_list(component, "assignment");
+    return is_tagged_record(component, "assignment");
 }
 function assignment_symbol(component: Assignment): Symbol {
-    return head(tail(head(tail(component))));
+    return component.name.symbol;
 }
 function assignment_value_expression(component: Assignment): Expression {
-    return head(tail(tail(component)));
+    return component.right_hand_side;
 }
 
 function is_declaration(component: Component): component is Declaration {
-    return is_tagged_list(component, "constant_declaration") ||
-           is_tagged_list(component, "function_declaration");
+    return is_tagged_record(component, "constant_declaration") ||
+           is_tagged_record(component, "function_declaration");
 }
 
 function declaration_symbol(component: Declaration): Symbol {
-    return symbol_of_name(head(tail(component)));
+    return symbol_of_name(component.name);
 }
 function declaration_value_expression(component: Declaration): Expression {
-    return head(tail(tail(component)));
+    if(component.tag === "constant_declaration") {
+        return component.initialiser;
+    } else {
+        return function_decl_to_constant_decl(component).initialiser;
+    }
 }
 
 function make_constant_declaration(name: Name, value_expression: Expression): Constant {
-    return pair("constant_declaration", pair(name, pair(value_expression, null)));
+    return {tag: "constant_declaration", name: name, initialiser: value_expression};
 }
 
 function is_lambda_expression(component: Component): component is Lambda {
-    return is_tagged_list(component, "lambda_expression");
+    return is_tagged_record(component, "lambda_expression");
 }
 function lambda_parameter_symbols(component: Lambda): List<Symbol> {
-    return map(symbol_of_name, head(tail(component)));
+    return map(symbol_of_name, component.parameters);
 }
 function lambda_body(component: Lambda): Component {
-    return head(tail(tail(component)));
+    return component.body;
 }
 
 function make_lambda_expression(parameters: List<Name>, body: Component): Lambda {
-    return list("lambda_expression", parameters, body);
+    return {tag: "lambda_expression", parameters: parameters, body: body};
 }
 
 function is_function_declaration(component: Component): component is Function {
-    return is_tagged_list(component, "function_declaration");
+    return is_tagged_record(component, "function_declaration");
 }
 function function_declaration_name(component: Function): Name {
-    return head(tail(component));
+    return component.name;
 }
 function function_declaration_parameters(component: Function): List<Name> {
-    return head(tail(tail(component)));
+    return component.parameters;
 }
 function function_declaration_body(component: Function): Component {
-    return head(tail(tail(tail(component))));
+    return component.body;
 }
 function function_decl_to_constant_decl(component: Function): Constant {
     return make_constant_declaration(
@@ -441,30 +445,30 @@ function function_decl_to_constant_decl(component: Function): Constant {
 }
 
 function is_return_statement(component: Component): component is ReturnStatement {
-   return is_tagged_list(component, "return_statement");
+   return is_tagged_record(component, "return_statement");
 }
 function return_expression(component: ReturnStatement): Expression {
-   return head(tail(component));
+    return component.return_expression;
 }
 
 function is_conditional(component: Component): component is Conditional {
-    return is_tagged_list(component, "conditional_expression");
+    return is_tagged_record(component, "conditional_expression");
 }
 function conditional_predicate(component: Conditional): Expression {
-   return head(tail(component));
+    return component.predicate;
 }
 function conditional_consequent(component: Conditional): Component {
-    return head(tail(tail(component)));
+    return component.consequent;
 }
 function conditional_alternative(component: Conditional): Component {
-    return head(tail(tail(tail(component))));
+    return component.alternative;
 }
 
 function is_sequence(stmt: Component): stmt is Sequence {
-   return is_tagged_list(stmt, "sequence");
+   return is_tagged_record(stmt, "sequence");
 }
 function sequence_statements(stmt: Sequence): List<Statement> {
-   return head(tail(stmt));
+    return stmt.statements;
 }
 function first_statement(stmts: NonEmptyList<Statement>): Statement {
    return head(stmts);
@@ -480,14 +484,14 @@ function is_last_statement(stmts: NonEmptyList<Statement>): boolean {
 }
 
 function is_block(component: Component): component is Block {
-    return is_tagged_list(component, "block");
+    return is_tagged_record(component, "block");
 }
 function block_body(component: Block): Component {
-    return head(tail(component));
+    return component.body;
 }
 
 function make_block(statement: Statement): Block {
-    return pair("block", pair(statement, null));
+    return {tag: "block", body: statement};
 }
 
 function is_operator_combination(component: Component): component is OperatorCombination {
@@ -495,24 +499,27 @@ function is_operator_combination(component: Component): component is OperatorCom
            is_binary_operator_combination(component);
 }
 function is_unary_operator_combination(component: Component): component is Unary {
-    return is_tagged_list(component, "unary_operator_combination");
+    return is_tagged_record(component, "unary_operator_combination");
 }
 function is_binary_operator_combination(component: Component): component is Binary {
-    return is_tagged_list(component, "binary_operator_combination");
+    return is_tagged_record(component, "binary_operator_combination");
 }
 function operator_symbol(component: OperatorCombination): Operator {
-    return head(tail(component as Unary)); // Unary and Binary have the same structure to this point.
+    return component.operator;
 }
 function first_operand(component: OperatorCombination): Expression {
-    return head(tail(tail(component as Unary))); // Unary and Binary have the same structure to this point.
+    if(component.tag === "unary_operator_combination") {
+        return component.operand;
+    } else {
+        return component.left;
+    }
 }
 function second_operand(component: Binary): Expression {
-    return head(tail(tail(tail(component))));
+    return component.right;
 }
 
 function make_application(function_expression: Expression, argument_expressions: List<Expression>): Application {
-    return pair("application",
-                pair(function_expression, pair(argument_expressions, null)));
+    return {tag: "application", function_expression: function_expression, arguments: argument_expressions};
 }
 
 function operator_combination_to_application(component: OperatorCombination): Application {
@@ -526,13 +533,13 @@ function operator_combination_to_application(component: OperatorCombination): Ap
 }
 
 function is_application(component: Component): component is Application {
-   return is_tagged_list(component, "application");
+   return is_tagged_record(component, "application");
 }
 function function_expression(component: Application): Expression {
-   return head(tail(component));
+    return component.function_expression;
 }
 function arg_expressions(component: Application): List<Expression> {
-   return head(tail(tail(component)));
+    return component.arguments;
 }
 
 // functions from SICP JS 4.1.3
@@ -548,28 +555,28 @@ function make_function(parameters: List<Symbol>, body: Component, env: Environme
     return pair("compound_function", pair(parameters, pair(body, pair(env, null))));
 }
 function is_compound_function(f: Value): f is CompoundFunction {
-    return is_tagged_list(f, "compound_function");
+    return is_tagged_record(f, "compound_function");
 }
 function function_parameters(f: CompoundFunction): List<Symbol> {
-    return head(tail(f));
+    return f.arguments;
 }
 
 function function_body(f: CompoundFunction): Component {
-    return head(tail(tail(f)));
+    return f.body;
 }
 
 function function_environment(f: CompoundFunction): Environment {
-    return head(tail(tail(tail(f))));
+    return f.env;
 }
 
 function make_return_value(content: Value): ReturnValue {
-    return pair("return_value", pair(content, null));
+    return {tag: "return_value", content: content};
 }
 function is_return_value(value: Value): value is ReturnValue {
-    return is_tagged_list(value, "return_value");
+    return is_tagged_record(value, "return_value");
 }
 function return_value_content(value: ReturnValue): Value {
-    return head(tail(value));
+    return value.content;
 }
 
 function enclosing_environment(env: NonEmptyList<Frame>): Environment {
@@ -642,7 +649,7 @@ function assign_symbol_value(symbol: Symbol, val: Value, env: Environment): void
 // functions from SICP JS 4.1.4
 
 function is_primitive_function(fun: Value): fun is Primitive {
-    return is_tagged_list(fun, "primitive");
+    return is_tagged_record(fun, "primitive");
 }
 
 function primitive_implementation(fun: Primitive): (..._: any[]) => any { return head(tail(fun)); }
