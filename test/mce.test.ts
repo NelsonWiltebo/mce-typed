@@ -3,11 +3,11 @@ import {
     parse
 } from 'sicp';
 import {
-    evaluate, tagged_list_to_record, Environment, scan_out_declarations, list_of_unassigned, extend_environment,
-    setup_environment
+    evaluate, extend_environment, list_of_unassigned, scan_out_declarations, setup_environment, tagged_list_to_record
 } from '../src/mce';
 
-let base_env: Environment = setup_environment();
+
+let base_env = setup_environment();
 
 test ('literal', () => {
     expect(evaluate(tagged_list_to_record(parse("5;")), null)).toStrictEqual(5)
@@ -39,4 +39,19 @@ test ('function declaration', () => {
 
 test ('conditional', () => {
     expect(evaluate(tagged_list_to_record(parse("x > 120 ? true : false;")), base_env)).toStrictEqual(false);
+});
+
+test ('assignment', () => {
+    evaluate(tagged_list_to_record(parse("x = x - 1;")), base_env);
+    expect(evaluate(tagged_list_to_record(parse("x;")), base_env)).toStrictEqual(4);
+});
+
+test ('high-order function', () => {
+    const program = tagged_list_to_record(parse("function a(x) {function b(x) {return x > 33 ? b(x - 10) : 2;}return x > 66 ? b(x - 1) : 1;}"));
+    const locals = scan_out_declarations(program);
+    const unassigneds = list_of_unassigned(locals);
+    base_env = extend_environment(
+                                locals, unassigneds, base_env);
+    expect(evaluate(program, base_env)).toStrictEqual(undefined);
+    expect(evaluate(tagged_list_to_record(parse("a(100);")), base_env)).toStrictEqual(2);
 });
