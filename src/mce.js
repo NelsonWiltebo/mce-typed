@@ -258,6 +258,9 @@ function eval_declaration(component, env) {
     return undefined;
 }
 // functions from SICP JS 4.1.2
+function is_tagged_list(component, the_tag) {
+    return (0, sicp_1.is_pair)(component) && (0, sicp_1.head)(component) === the_tag;
+}
 function is_tagged_record(component, the_tag) {
     return (0, sicp_1.is_pair)(component) ? false : component.tag === the_tag;
 }
@@ -431,25 +434,25 @@ function make_function(parameters, body, env) {
     return (0, sicp_1.pair)("compound_function", (0, sicp_1.pair)(parameters, (0, sicp_1.pair)(body, (0, sicp_1.pair)(env, null))));
 }
 function is_compound_function(f) {
-    return is_tagged_record(f, "compound_function");
+    return is_tagged_list(f, "compound_function");
 }
 function function_parameters(f) {
-    return f.arguments;
+    return (0, sicp_1.head)((0, sicp_1.tail)(f));
 }
 function function_body(f) {
-    return f.body;
+    return (0, sicp_1.head)((0, sicp_1.tail)((0, sicp_1.tail)(f)));
 }
 function function_environment(f) {
-    return f.env;
+    return (0, sicp_1.head)((0, sicp_1.tail)((0, sicp_1.tail)((0, sicp_1.tail)(f))));
 }
 function make_return_value(content) {
-    return { tag: "return_value", content: content };
+    return (0, sicp_1.pair)("return_value", (0, sicp_1.pair)(content, null));
 }
 function is_return_value(value) {
-    return is_tagged_record(value, "return_value");
+    return is_tagged_list(value, "return_value");
 }
 function return_value_content(value) {
-    return value.content;
+    return (0, sicp_1.head)((0, sicp_1.tail)(value));
 }
 function enclosing_environment(env) {
     return (0, sicp_1.tail)(env);
@@ -512,7 +515,7 @@ function assign_symbol_value(symbol, val, env) {
 }
 // functions from SICP JS 4.1.4
 function is_primitive_function(fun) {
-    return is_tagged_record(fun, "primitive");
+    return is_tagged_list(fun, "primitive");
 }
 function primitive_implementation(fun) { return (0, sicp_1.head)((0, sicp_1.tail)(fun)); }
 var primitive_functions = (0, sicp_1.list)((0, sicp_1.pair)("head", (0, sicp_1.pair)(sicp_1.head, null)), (0, sicp_1.pair)("tail", (0, sicp_1.pair)(sicp_1.tail, null)), (0, sicp_1.pair)("pair", (0, sicp_1.pair)(sicp_1.pair, null)), (0, sicp_1.pair)("list", (0, sicp_1.pair)(sicp_1.list, null)), (0, sicp_1.pair)("is_null", (0, sicp_1.pair)(sicp_1.is_null, null)), (0, sicp_1.pair)("display", (0, sicp_1.pair)(sicp_1.display, null)), (0, sicp_1.pair)("error", (0, sicp_1.pair)(sicp_1.error, null)), (0, sicp_1.pair)("math_abs", (0, sicp_1.pair)(sicp_1.math_abs, null)), (0, sicp_1.pair)("+", (0, sicp_1.pair)(function (x, y) { return x + y; }, null)), (0, sicp_1.pair)("-", (0, sicp_1.pair)(function (x, y) { return x - y; }, null)), (0, sicp_1.pair)("-unary", (0, sicp_1.pair)(function (x) { return -x; }, null)), (0, sicp_1.pair)("*", (0, sicp_1.pair)(function (x, y) { return x * y; }, null)), (0, sicp_1.pair)("/", (0, sicp_1.pair)(function (x, y) { return x / y; }, null)), (0, sicp_1.pair)("%", (0, sicp_1.pair)(function (x, y) { return x % y; }, null)), (0, sicp_1.pair)("===", (0, sicp_1.pair)(function (x, y) { return x === y; }, null)), (0, sicp_1.pair)("!==", (0, sicp_1.pair)(function (x, y) { return x !== y; }, null)), (0, sicp_1.pair)("<", (0, sicp_1.pair)(function (x, y) { return x < y; }, null)), (0, sicp_1.pair)("<=", (0, sicp_1.pair)(function (x, y) { return x <= y; }, null)), (0, sicp_1.pair)(">", (0, sicp_1.pair)(function (x, y) { return x > y; }, null)), (0, sicp_1.pair)(">=", (0, sicp_1.pair)(function (x, y) { return x >= y; }, null)), (0, sicp_1.pair)("!", (0, sicp_1.pair)(function (x) { return !x; }, null)));

@@ -61,13 +61,13 @@ type Application = { tag: "application", function_expression: Expression, argume
 type OperatorCombination = Unary | Binary;
 type Operator = "+" | "-" | "*" | "/";
 type Unary = { tag: "unary_operator_combination", operator: Operator, operand: Expression };
-type Binary= { tag: "binary_operator_combination", operator: Operator, left: Expression, right: Expression };
+type Binary = { tag: "binary_operator_combination", operator: Operator, left: Expression, right: Expression };
 
 // these can remain as tagged lists (but you are free to change them too)
 type Value = string | number | boolean | undefined | null | ReturnValue | CompoundFunction | Primitive;
-type ReturnValue = {tag: "return_value", content: Value};
-type CompoundFunction = {tag: "compound_function", arguments: List<Symbol>, body: Component, env: Environment};
-type Primitive = {tag: "primitive", value: (..._: any[]) => any};
+type ReturnValue = ["return_value", [Value, null]];
+type CompoundFunction = ["compound_function", [List<Symbol>, [Component, [Environment, null]]]];
+type Primitive = ["primitive", [(..._: any[]) => any, null]];
 
 type Symbol = string;
 
@@ -353,6 +353,10 @@ function eval_declaration(component: Declaration, env: Environment): void {
 
 // functions from SICP JS 4.1.2
 
+function is_tagged_list(component: any, the_tag: string): boolean {
+    return is_pair(component) && head(component) === the_tag;
+}
+
 function is_tagged_record(component: any, the_tag: string): boolean {
     return is_pair(component) ? false : (component as TaggedRecord).tag === the_tag;
 }
@@ -555,28 +559,28 @@ function make_function(parameters: List<Symbol>, body: Component, env: Environme
     return pair("compound_function", pair(parameters, pair(body, pair(env, null))));
 }
 function is_compound_function(f: Value): f is CompoundFunction {
-    return is_tagged_record(f, "compound_function");
+    return is_tagged_list(f, "compound_function");
 }
 function function_parameters(f: CompoundFunction): List<Symbol> {
-    return f.arguments;
+    return head(tail(f));
 }
 
 function function_body(f: CompoundFunction): Component {
-    return f.body;
+    return head(tail(tail(f)));
 }
 
 function function_environment(f: CompoundFunction): Environment {
-    return f.env;
+    return head(tail(tail(tail(f))));
 }
 
 function make_return_value(content: Value): ReturnValue {
-    return {tag: "return_value", content: content};
+    return pair("return_value", pair(content, null));
 }
 function is_return_value(value: Value): value is ReturnValue {
-    return is_tagged_record(value, "return_value");
+    return is_tagged_list(value, "return_value");
 }
 function return_value_content(value: ReturnValue): Value {
-    return value.content;
+    return head(tail(value));
 }
 
 function enclosing_environment(env: NonEmptyList<Frame>): Environment {
@@ -649,7 +653,7 @@ function assign_symbol_value(symbol: Symbol, val: Value, env: Environment): void
 // functions from SICP JS 4.1.4
 
 function is_primitive_function(fun: Value): fun is Primitive {
-    return is_tagged_record(fun, "primitive");
+    return is_tagged_list(fun, "primitive");
 }
 
 function primitive_implementation(fun: Primitive): (..._: any[]) => any { return head(tail(fun)); }
